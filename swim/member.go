@@ -63,6 +63,12 @@ func (m Member) incarnation() int64 {
 	return m.Incarnation
 }
 
+func (m *Member) populateFromChange(c *Change) {
+	m.Address = c.Address
+	m.Incarnation = c.Incarnation
+	m.Status = c.Status
+}
+
 // checksumString fills a buffer that is passed with the contents that this node
 // needs to add to the checksum string.
 func (m *Member) checksumString(b *bytes.Buffer) {

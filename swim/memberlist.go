@@ -446,11 +446,8 @@ func (m *memberlist) Apply(change Change) bool {
 			return false
 		}
 
-		member = &Member{
-			Address:     change.Address,
-			Status:      change.Status,
-			Incarnation: change.Incarnation,
-		}
+		member = &Member{}
+		member.populateFromChange(&change)
 
 		if member.Address == m.node.Address() {
 			// copy the state of the member to the local member
