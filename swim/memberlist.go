@@ -242,7 +242,22 @@ func (m *memberlist) GetMembers() (members []Member) {
 // Reincarnate sets the status of the node to Alive and updates the incarnation
 // number. It adds the change to the disseminator as well.
 func (m *memberlist) Reincarnate() []Change {
-	return m.MakeAlive(m.node.address, nowInMillis(m.node.clock))
+	return m.MakeAlive(m.local.Address, nowInMillis(m.node.clock))
+}
+
+// creates a change that reincarnates the local node. It does not change the
+// state of the node but rather reasserts its state by bumping its incarnation
+// number.
+func (m *memberlist) reincarnationChange() Change {
+	// reincarnate the local copy of the state of the node
+	m.local.Incarnation = nowInMillis(m.node.clock)
+
+	// create a change to disseminate around
+	change := Change{}
+	change.populateSource(m.local)
+	change.populateSubject(m.local)
+
+	return change
 }
 
 func (m *memberlist) MakeAlive(address string, incarnation int64) []Change {
@@ -350,15 +365,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 		// if change is local override, reassert member is alive
 		if member.localOverride(m.node.Address(), change) {
 			m.node.emit(RefuteUpdateEvent{})
-			newIncNo := nowInMillis(m.node.clock)
-			overrideChange := Change{
-				Source:            m.node.Address(),
-				SourceIncarnation: newIncNo,
-				Address:           change.Address,
-				Incarnation:       newIncNo,
-				Status:            Alive,
-				Timestamp:         util.Timestamp(time.Now()),
-			}
+			overrideChange := m.reincarnationChange()
 
 			if m.Apply(overrideChange) {
 				applied = append(applied, overrideChange)
@@ -446,7 +453,11 @@ func (m *memberlist) Apply(change Change) bool {
 		}
 
 		if member.Address == m.node.Address() {
-			m.local = member
+			// copy the state of the member to the local member
+			*m.local = *member
+			// and use the pointer to the local member in favor the new created
+			// member object. This will prevent the local state to ever change
+			member = m.local
 		}
 
 		m.members.byAddress[change.Address] = member
