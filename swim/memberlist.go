@@ -23,7 +23,6 @@ package swim
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"sort"
 	"sync"
@@ -112,6 +111,7 @@ func (m *memberlist) ComputeChecksum() {
 // generates string to use when computing checksum
 func (m *memberlist) GenChecksumString() string {
 	var strings sort.StringSlice
+	var buf bytes.Buffer
 
 	for _, member := range m.members.list {
 		// Don't include Tombstone nodes in the checksum to avoid
@@ -119,8 +119,12 @@ func (m *memberlist) GenChecksumString() string {
 		if member.Status == Tombstone {
 			continue
 		}
-		s := fmt.Sprintf("%s%s%v", member.Address, member.Status, member.Incarnation)
-		strings = append(strings, s)
+
+		// collect the string from the member and add it to the list of strings
+		member.checksumString(&buf)
+		strings = append(strings, buf.String())
+		// the buffer is reused for the next member and expected to be empty
+		buf.Reset()
 	}
 
 	strings.Sort()

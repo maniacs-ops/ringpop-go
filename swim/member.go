@@ -21,6 +21,8 @@
 package swim
 
 import (
+	"bytes"
+	"fmt"
 	"math/rand"
 	"sync"
 
@@ -59,6 +61,12 @@ func (m Member) address() string {
 
 func (m Member) incarnation() int64 {
 	return m.Incarnation
+}
+
+// checksumString fills a buffer that is passed with the contents that this node
+// needs to add to the checksum string.
+func (m *Member) checksumString(b *bytes.Buffer) {
+	fmt.Fprintf(b, "%s%s%v", m.Address, m.Status, m.Incarnation)
 }
 
 // shuffles slice of members pseudo-randomly, returns new slice
