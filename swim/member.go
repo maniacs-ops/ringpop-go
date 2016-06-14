@@ -174,6 +174,23 @@ func (c Change) validateOutgoing() Change {
 	return c
 }
 
+func (c *Change) populateSubject(m *Member) {
+	if m == nil {
+		return
+	}
+	c.Address = m.Address
+	c.Incarnation = m.Incarnation
+	c.Status = m.Status
+}
+
+func (c *Change) populateSource(m *Member) {
+	if m == nil {
+		return
+	}
+	c.Source = m.Address
+	c.SourceIncarnation = m.Incarnation
+}
+
 // suspect interface
 func (c Change) address() string {
 	return c.Address

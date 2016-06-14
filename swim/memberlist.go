@@ -290,22 +290,34 @@ func (m *memberlist) Evict(address string) {
 
 // makes a change to the member list
 func (m *memberlist) MakeChange(address string, incarnation int64, status string) []Change {
-	changes := m.Update([]Change{Change{
-		Source:            m.local.Address,
-		SourceIncarnation: m.local.Incarnation,
-		Address:           address,
-		Incarnation:       incarnation,
-		Status:            status,
-		Timestamp:         util.Timestamp(time.Now()),
-	}})
 
-	if len(changes) > 0 {
+	member, _ := m.Member(address)
+
+	// create the new change based on information know to the memberlist
+	var change Change
+	change.populateSubject(member)
+	change.populateSource(m.local)
+
+	// Override values that are specific to the change we are making
+	change.Address = address
+	change.Incarnation = incarnation
+	change.Status = status
+	// Keep track of when the change was made
+	change.Timestamp = util.Timestamp(time.Now())
+
+	return m.ApplyChange(change)
+}
+
+func (m *memberlist) ApplyChange(c Change) []Change {
+	applied := m.Update([]Change{c})
+
+	if len(applied) > 0 {
 		m.logger.WithFields(bark.Fields{
-			"update": changes[0],
-		}).Debugf("ringpop member declares other member %s", changes[0].Status)
+			"update": applied[0],
+		}).Debugf("ringpop member declares other member %s", applied[0].Status)
 	}
 
-	return changes
+	return applied
 }
 
 // updates the member list with the slice of changes, applying selectively
