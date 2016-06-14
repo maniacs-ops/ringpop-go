@@ -64,6 +64,13 @@ func newMemberlist(n *Node) *memberlist {
 	m := &memberlist{
 		node:   n,
 		logger: logging.Logger("membership").WithField("local", n.address),
+
+		// prepopulate the local member with its state
+		local: &Member{
+			Address:     n.Address(),
+			Incarnation: util.TimeNowMS(),
+			Status:      Alive,
+		},
 	}
 
 	m.members.byAddress = make(map[string]*Member)
@@ -280,14 +287,6 @@ func (m *memberlist) Evict(address string) {
 
 // makes a change to the member list
 func (m *memberlist) MakeChange(address string, incarnation int64, status string) []Change {
-	if m.local == nil {
-		m.local = &Member{
-			Address:     m.node.Address(),
-			Incarnation: util.TimeNowMS(),
-			Status:      Alive,
-		}
-	}
-
 	changes := m.Update([]Change{Change{
 		Source:            m.local.Address,
 		SourceIncarnation: m.local.Incarnation,
