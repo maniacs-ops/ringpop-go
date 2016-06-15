@@ -463,8 +463,7 @@ func (m *memberlist) Apply(change Change) bool {
 	}
 
 	member.Lock()
-	member.Status = change.Status
-	member.Incarnation = change.Incarnation
+	member.populateFromChange(&change)
 	member.Unlock()
 
 	return true
