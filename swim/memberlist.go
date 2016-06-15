@@ -67,13 +67,12 @@ func newMemberlist(n *Node) *memberlist {
 		// prepopulate the local member with its state
 		local: &Member{
 			Address:     n.Address(),
-			Incarnation: util.TimeNowMS(),
+			Incarnation: nowInMillis(n.clock),
 			Status:      Alive,
 		},
 	}
 
 	m.members.byAddress = make(map[string]*Member)
-
 	return m
 }
 
