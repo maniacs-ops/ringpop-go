@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"sort"
 	"sync"
 
 	"github.com/uber/ringpop-go/util"
@@ -49,9 +50,10 @@ const (
 // A Member is a member in the member list
 type Member struct {
 	sync.RWMutex
-	Address     string `json:"address"`
-	Status      string `json:"status"`
-	Incarnation int64  `json:"incarnationNumber"`
+	Address     string            `json:"address"`
+	Status      string            `json:"status"`
+	Incarnation int64             `json:"incarnationNumber"`
+	Labels      map[string]string `json:"labels,omitempty"`
 }
 
 // suspect interface
@@ -67,12 +69,36 @@ func (m *Member) populateFromChange(c *Change) {
 	m.Address = c.Address
 	m.Incarnation = c.Incarnation
 	m.Status = c.Status
+	m.Labels = c.Labels
 }
 
 // checksumString fills a buffer that is passed with the contents that this node
 // needs to add to the checksum string.
 func (m *Member) checksumString(b *bytes.Buffer) {
 	fmt.Fprintf(b, "%s%s%v", m.Address, m.Status, m.Incarnation)
+
+	// add the labels to the checksumstring
+	labels := m.Labels
+	if len(labels) > 0 {
+
+		// to ensure deterministic string generation we will sort the keys
+		// before adding them to the buffer
+		keys := make([]string, 0, len(labels))
+		for key, _ := range labels {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		for _, key := range keys {
+			value := labels[key]
+			// add the label seperator. By adding the seperator at the beginning
+			// it will seperate the labels from the beginning for the checksum
+			b.WriteString("-")
+			b.WriteString(key)
+			b.WriteString("-")
+			b.WriteString(value)
+		}
+	}
 }
 
 // shuffles slice of members pseudo-randomly, returns new slice
@@ -147,12 +173,13 @@ func (m *Member) isReachable() bool {
 
 // A Change is a change a member to be applied
 type Change struct {
-	Source            string `json:"source"`
-	SourceIncarnation int64  `json:"sourceIncarnationNumber"`
-	Address           string `json:"address"`
-	Incarnation       int64  `json:"incarnationNumber"`
-	Status            string `json:"status"`
-	Tombstone         bool   `json:"tombstone,omitempty"`
+	Source            string            `json:"source"`
+	SourceIncarnation int64             `json:"sourceIncarnationNumber"`
+	Address           string            `json:"address"`
+	Incarnation       int64             `json:"incarnationNumber"`
+	Status            string            `json:"status"`
+	Tombstone         bool              `json:"tombstone,omitempty"`
+	Labels            map[string]string `json:"labels,omitempty"`
 	// Use util.Timestamp for bi-direction binding to time encoded as
 	// integer Unix timestamp in JSON
 	Timestamp util.Timestamp `json:"timestamp"`
@@ -187,6 +214,7 @@ func (c *Change) populateSubject(m *Member) {
 	c.Address = m.Address
 	c.Incarnation = m.Incarnation
 	c.Status = m.Status
+	c.Labels = m.Labels
 }
 
 func (c *Change) populateSource(m *Member) {

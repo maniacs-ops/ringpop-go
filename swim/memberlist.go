@@ -280,6 +280,38 @@ func (m *memberlist) MakeLeave(address string, incarnation int64) []Change {
 	return m.MakeChange(address, incarnation, Leave)
 }
 
+func (m *memberlist) SetLocalLabel(key, value string) {
+	// ensure that there is a labels map
+	if m.local.Labels == nil {
+		m.local.Labels = make(map[string]string)
+	}
+
+	// set the label
+	m.local.Labels[key] = value
+
+	// profit
+	m.postLocalUpdate()
+}
+
+func (m *memberlist) postLocalUpdate() {
+	// bump our incarnation for this change to be accepted by all peers
+	m.local.Incarnation = nowInMillis(m.node.clock)
+
+	// since we changed our local state we need to update our checksum
+	m.ComputeChecksum()
+
+	// prepare the gossip
+	change := Change{}
+	change.populateSubject(m.local)
+	change.populateSource(m.local)
+
+	changes := []Change{change}
+
+	// kick in our updating mechanism
+	m.node.handleChanges(changes)
+	m.node.rollup.TrackUpdates(changes)
+}
+
 // MakeTombstone declares the node with the provided address in the tombstone state
 // on the given incarnation number. If the incarnation number in the local memberlist
 // is already higher than the incartation number provided in this function it is

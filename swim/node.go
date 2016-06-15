@@ -523,3 +523,7 @@ func (n *Node) GetReachableMembers() []string {
 func (n *Node) CountReachableMembers() int {
 	return n.memberlist.CountReachableMembers()
 }
+
+func (n *Node) SetLabel(key, value string) {
+	n.memberlist.SetLocalLabel(key, value)
+}
