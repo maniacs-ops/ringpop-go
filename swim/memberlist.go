@@ -288,11 +288,45 @@ func (m *memberlist) SetLocalLabel(key, value string) {
 
 	// set the label
 	m.local.Labels[key] = value
-
-	// profit
 	m.postLocalUpdate()
 }
 
+// SetLocalLabels updates multiple labels at once. It will take all the labels
+// that are set in the map passed to this function and overwrite the value with
+// the value in the map. Keys that are not present in the provided map will
+// remain in the labels of this node.
+func (m *memberlist) SetLocalLabels(labels map[string]string) {
+	// ensure that there is a labels map
+	if m.local.Labels == nil {
+		m.local.Labels = make(map[string]string)
+	}
+
+	// copy the key-value pairs to our internal labels. By not setting the map
+	// of labels to the Labels value of the local member we prevent removing labels
+	// that the user did not specify in the new map.
+	for key, value := range labels {
+		m.local.Labels[key] = value
+	}
+	m.postLocalUpdate()
+}
+
+// Remove a label from the local map of labels. This will trigger a reincarnation
+// of the member to gossip its labels around.
+func (m *memberlist) RemoveLocalLabel(keys ...string) {
+	if m.local.Labels == nil {
+		// nothing to delete
+		return
+	}
+
+	for _, key := range keys {
+		delete(m.local.Labels, key)
+	}
+	m.postLocalUpdate()
+}
+
+// postLocalUpdate should be called after the local Member has been updated to
+// make sure that its new state has a higher incarnation number and the change
+// will be recorded as a change to gossip around.
 func (m *memberlist) postLocalUpdate() {
 	// bump our incarnation for this change to be accepted by all peers
 	m.local.Incarnation = nowInMillis(m.node.clock)

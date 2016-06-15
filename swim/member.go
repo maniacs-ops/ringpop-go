@@ -113,10 +113,24 @@ func shuffle(members []*Member) []*Member {
 	return newMembers
 }
 
-// nonLocalOverride returns wether a change should be applied to the member.
-// This function assumes that the address of the member and the change are
-// equal.
+// nonLocalOverride returns wether a change should be applied to the member and
+// therefore overrides the state of the member. This will take into account the
+// following rules in order:
+//  1. the change must be about this node (same address)
+//  2. the highest incarnation number indicates which state is newest
+//  3. when incarnation numbers are the same the state will determine which
+//     state shall be taken
+//  4. TODO have deterministic label resolving when labels are not the same.
+//     even though the labels should only be changed by the owning node bugs in
+//     parts of the gossip protocol might not gossip or change labels
+//     unintentionally. To make sure the owner learnes about it and give it a
+//     chance to reincarnate the offending gossip should be deterministically
+//     chosen and disseminated around.
 func (m *Member) nonLocalOverride(change Change) bool {
+	if change.Address != m.Address {
+		return false
+	}
+
 	// change is younger than current member
 	if change.Incarnation > m.Incarnation {
 		return true
