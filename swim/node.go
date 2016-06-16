@@ -226,6 +226,13 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 	)
 	node.gossip = newGossip(node, opts.MinProtocolPeriod)
 	node.disseminator = newDisseminator(node)
+
+	for _, member := range node.memberlist.GetMembers() {
+		change := Change{}
+		change.populateSubject(&member)
+		node.disseminator.RecordChange(change)
+	}
+
 	node.rollup = newUpdateRollup(node, opts.RollupFlushInterval,
 		opts.RollupMaxUpdates)
 

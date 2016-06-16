@@ -117,6 +117,48 @@ func shuffle(members []*Member) []*Member {
 	return newMembers
 }
 
+// acceptGossip evaluates the rules of swim to accept the gossip as the new state
+// of the member.
+func acceptGossip(old *Member, gossip *Member) bool {
+	// tombstones will not be accepted if we have no knowledge about the member
+	if gossip.Status == Tombstone && old == nil {
+		return false
+	}
+
+	// accept the gossip if we learn about the member through a gossip
+	if old == nil {
+		return true
+	}
+
+	// gossips with a higher incarnation number will always be accepted since
+	// it is a newer version of the member than we know
+	if gossip.Incarnation > old.Incarnation {
+		return true
+	}
+
+	// gossips with a lower incarnation number will never be accepted as we
+	// have a newer version of the member already
+	if gossip.Incarnation < old.Incarnation {
+		return false
+	}
+
+	// now we know that the incarnation number of the gossip and the current
+	// view of the member are the same 'age'. Lets evaluate member state to see
+	// which version to pick
+
+	// if the status of the gossip takes precedence over the status of our
+	// current member we will accept the gossip.
+	if statePrecedence(gossip.Status) > statePrecedence(old.Status) {
+		return true
+	}
+
+	// TODO add check to deterministically pick a member based on the labels
+
+	// in the end there is no reason to accept the gossip, we already have the
+	// latest view of the node.
+	return false
+}
+
 // nonLocalOverride returns wether a change should be applied to the member and
 // therefore overrides the state of the member. This will take into account the
 // following rules in order:
@@ -164,7 +206,12 @@ func (m *Member) localOverride(local string, change Change) bool {
 		return false
 	}
 
-	return change.Status == Faulty || change.Status == Suspect || change.Status == Tombstone
+	// These changes do not override our local state since we can self declare them
+	if change.Status == Alive || change.Status == Leave {
+		return false
+	}
+
+	return true
 }
 
 func statePrecedence(s string) int {

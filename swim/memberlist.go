@@ -73,6 +73,9 @@ func newMemberlist(n *Node) *memberlist {
 	}
 
 	m.members.byAddress = make(map[string]*Member)
+	m.members.byAddress[m.local.Address] = m.local
+	m.members.list = append(m.members.list, m.local)
+
 	return m
 }
 
@@ -279,6 +282,11 @@ func (m *memberlist) MakeLeave(address string, incarnation int64) []Change {
 	return m.MakeChange(address, incarnation, Leave)
 }
 
+func (m *memberlist) SetLocalStatus(status string) {
+	m.local.Status = status
+	m.postLocalUpdate()
+}
+
 func (m *memberlist) SetLocalLabel(key, value string) {
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
@@ -414,42 +422,52 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 	m.node.emit(MemberlistChangesReceivedEvent{changes})
 
 	m.Lock()
+
+	// run through all changes received and figure out if they need to be accepted
 	m.members.Lock()
-
 	for _, change := range changes {
-		member, ok := m.members.byAddress[change.Address]
+		member, has := m.members.byAddress[change.Address]
 
-		// first time member has been seen, take change wholesale
-		if !ok {
-			if m.Apply(change) {
-				applied = append(applied, change)
+		// transform the change into a member that we can test against existing
+		// members
+		gossip := Member{}
+		gossip.populateFromChange(&change)
+
+		// test to see if we accpet the gossip
+		if acceptGossip(member, &gossip) {
+			// the gossip is accepted
+
+			if gossip.Address == m.local.Address {
+				// if the gossip is about the local member it needs to be
+				// countered with a reincarnation gossip
+				change = m.reincarnationChange()
+				m.node.emit(RefuteUpdateEvent{})
+			} else {
+				// otherwise it can be applied to the memberlist
+
+				// if the member was not already present in the list we will it
+				// needs to be added and randomly inserted in the list to ensure
+				// guarantees for pinging
+				if !has {
+					m.members.byAddress[gossip.Address] = &gossip
+					i := m.getJoinPosition()
+					m.members.list = append(m.members.list[:i], append([]*Member{&gossip}, m.members.list[i:]...)...)
+				} else {
+					// copy the state of the gossip to the member
+					*member = gossip
+				}
+
 			}
-			continue
-		}
 
-		// if change is local override, reassert member is alive
-		if member.localOverride(m.node.Address(), change) {
-			m.node.emit(RefuteUpdateEvent{})
-			overrideChange := m.reincarnationChange()
+			// keep track of the change that it has been applied
+			applied = append(applied, change)
 
-			if m.Apply(overrideChange) {
-				applied = append(applied, overrideChange)
-			}
-
-			continue
-		}
-
-		// if non-local override, apply change wholesale
-		if member.nonLocalOverride(change) {
-			if m.Apply(change) {
-				applied = append(applied, change)
-			}
 		}
 	}
-
 	m.members.Unlock()
 
 	if len(applied) > 0 {
+		// when there are changes applied we need to recalculate our checksum
 		oldChecksum := m.Checksum()
 		m.ComputeChecksum()
 
