@@ -50,11 +50,13 @@ const (
 // A Member is a member in the member list
 type Member struct {
 	sync.RWMutex
-	Address     string            `json:"address"`
-	Status      string            `json:"status"`
-	Incarnation int64             `json:"incarnationNumber"`
-	Labels      map[string]string `json:"labels,omitempty"`
+	Address     string   `json:"address"`
+	Status      string   `json:"status"`
+	Incarnation int64    `json:"incarnationNumber"`
+	Labels      LabelMap `json:"labels,omitempty"`
 }
+
+type LabelMap map[string]string
 
 // suspect interface
 func (m Member) address() string {
@@ -74,23 +76,25 @@ func (m *Member) populateFromChange(c *Change) {
 
 // checksumString fills a buffer that is passed with the contents that this node
 // needs to add to the checksum string.
-func (m *Member) checksumString(b *bytes.Buffer) {
+func (m Member) checksumString(b *bytes.Buffer) {
 	fmt.Fprintf(b, "%s%s%v", m.Address, m.Status, m.Incarnation)
+	m.Labels.checksumString(b)
+}
 
+func (l LabelMap) checksumString(b *bytes.Buffer) {
 	// add the labels to the checksumstring
-	labels := m.Labels
-	if len(labels) > 0 {
+	if len(l) > 0 {
 
 		// to ensure deterministic string generation we will sort the keys
 		// before adding them to the buffer
-		keys := make([]string, 0, len(labels))
-		for key, _ := range labels {
+		keys := make([]string, 0, len(l))
+		for key, _ := range l {
 			keys = append(keys, key)
 		}
 		sort.Strings(keys)
 
 		for _, key := range keys {
-			value := labels[key]
+			value := l[key]
 			// add the label seperator. By adding the seperator at the beginning
 			// it will seperate the labels from the beginning for the checksum
 			b.WriteString("-")
