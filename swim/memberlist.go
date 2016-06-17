@@ -55,7 +55,7 @@ type memberlist struct {
 	// could use members lock for that, but that introduces more deadlocks, so
 	// making a short-term fix instead by adding another lock. Like said, this
 	// is short-term, see github#113.
-	sync.Mutex
+	sync.RWMutex
 }
 
 // newMemberlist returns a new member list
@@ -516,40 +516,6 @@ func (m *memberlist) getJoinPosition() int {
 		return l
 	}
 	return rand.Intn(l)
-}
-
-// Apply tries to apply the change to the memberlsist. Returns true when the change was applied
-func (m *memberlist) Apply(change Change) bool {
-	member, ok := m.members.byAddress[change.Address]
-
-	if !ok {
-		// avoid indefinite tombstones by not creating new nodes
-		// directly in this state
-		if change.Status == Tombstone {
-			return false
-		}
-
-		member = &Member{}
-		member.populateFromChange(&change)
-
-		if member.Address == m.node.Address() {
-			// copy the state of the member to the local member
-			*m.local = *member
-			// and use the pointer to the local member in favor the new created
-			// member object. This will prevent the local state to ever change
-			member = m.local
-		}
-
-		m.members.byAddress[change.Address] = member
-		i := m.getJoinPosition()
-		m.members.list = append(m.members.list[:i], append([]*Member{member}, m.members.list[i:]...)...)
-	}
-
-	member.Lock()
-	member.populateFromChange(&change)
-	member.Unlock()
-
-	return true
 }
 
 // shuffles the member list

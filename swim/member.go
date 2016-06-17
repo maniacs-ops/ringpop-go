@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
-	"sync"
 
 	"github.com/uber/ringpop-go/util"
 )
@@ -49,7 +48,6 @@ const (
 
 // A Member is a member in the member list
 type Member struct {
-	sync.RWMutex
 	Address     string   `json:"address"`
 	Status      string   `json:"status"`
 	Incarnation int64    `json:"incarnationNumber"`
@@ -88,9 +86,10 @@ func (l LabelMap) checksumString(b *bytes.Buffer) {
 		// to ensure deterministic string generation we will sort the keys
 		// before adding them to the buffer
 		keys := make([]string, 0, len(l))
-		for key, _ := range l {
+		for key := range l {
 			keys = append(keys, key)
 		}
+		// TODO make sure this works on different locales
 		sort.Strings(keys)
 
 		for _, key := range keys {
@@ -157,61 +156,6 @@ func acceptGossip(old *Member, gossip *Member) bool {
 	// in the end there is no reason to accept the gossip, we already have the
 	// latest view of the node.
 	return false
-}
-
-// nonLocalOverride returns wether a change should be applied to the member and
-// therefore overrides the state of the member. This will take into account the
-// following rules in order:
-//  1. the change must be about this node (same address)
-//  2. the highest incarnation number indicates which state is newest
-//  3. when incarnation numbers are the same the state will determine which
-//     state shall be taken
-//  4. TODO have deterministic label resolving when labels are not the same.
-//     even though the labels should only be changed by the owning node bugs in
-//     parts of the gossip protocol might not gossip or change labels
-//     unintentionally. To make sure the owner learnes about it and give it a
-//     chance to reincarnate the offending gossip should be deterministically
-//     chosen and disseminated around.
-func (m *Member) nonLocalOverride(change Change) bool {
-	if change.Address != m.Address {
-		return false
-	}
-
-	// change is younger than current member
-	if change.Incarnation > m.Incarnation {
-		return true
-	}
-
-	// change is older than current member
-	if change.Incarnation < m.Incarnation {
-		return false
-	}
-
-	// If the incarnation numbers are equal, we look at the state to
-	// determine wether the change overrides this member.
-	return statePrecedence(change.Status) > statePrecedence(m.Status)
-}
-
-// localOverride returns whether the change will override the state of the local
-// member. When it will override the state the member should reincarnate itself
-// to make sure that other members see this node in a correct state.
-func (m *Member) localOverride(local string, change Change) bool {
-	if m.Address != local {
-		return false
-	}
-
-	// if the incarnation number of the change is smaller than the current
-	// incarnation number it is not overriding the change
-	if change.Incarnation < m.Incarnation {
-		return false
-	}
-
-	// These changes do not override our local state since we can self declare them
-	if change.Status == Alive || change.Status == Leave {
-		return false
-	}
-
-	return true
 }
 
 func statePrecedence(s string) int {
