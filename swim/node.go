@@ -529,6 +529,9 @@ func (n *Node) CountReachableMembers() int {
 	return n.memberlist.CountReachableMembers()
 }
 
+// SetLabel changes the contents of a label on the local ringpop node. Setting a
+// label will trigger the label to be gossiped around via SWIM to all participating
+// nodes. The label will eventually become available to all members to query on.
 func (n *Node) SetLabel(key, value string) {
 	n.memberlist.SetLocalLabel(key, value)
 }

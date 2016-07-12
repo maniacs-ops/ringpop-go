@@ -54,6 +54,8 @@ type Member struct {
 	Labels      LabelMap `json:"labels,omitempty"`
 }
 
+// LabelMap is a type Used by Member to store the labels of a member. It stores
+// string to string mappings containing user data that is gossiped around in SWIM.
 type LabelMap map[string]string
 
 // suspect interface
