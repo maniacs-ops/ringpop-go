@@ -74,52 +74,6 @@ func newChange(addr string, s state) Change {
 	}
 }
 
-func (s *MemberTestSuite) TestNonLocalOverride() {
-	// NonLocalOverride ignores the locallity and only cares about the
-	// incarnation number and status of the members and changes. Since
-	// the state (incNum, status pairs) slice is generated with ever
-	// increasing precendence, changes with index j override members
-	// with index i if and only if j > i.
-	for i, s1 := range s.states {
-		for j, s2 := range s.states {
-			m := newMember(s.localAddr, s1)
-			c := newChange(s.localAddr, s2)
-			expected := j > i
-			got := m.nonLocalOverride(c)
-			s.Equal(expected, got, "expected override if and only if j > i")
-
-			m = newMember(s.nonLocalAddr, s1)
-			c = newChange(s.nonLocalAddr, s2)
-			expected = j > i
-			got = m.nonLocalOverride(c)
-			s.Equal(expected, got, "expected override if and only if j > i")
-		}
-	}
-}
-
-func (s *MemberTestSuite) TestLocalOverride() {
-	// LocalOverride marks updates as overrides when the change will be applied
-	// to the status of this node. It follows the rules of SWIM with regards to
-	// the incarnation number, but is hardcoded to states that the node will
-	// never declare itself to. Meaning that it will allow the node to be in any
-	// of Alive or Leave state.
-	// The Update function reincarnates the node when LocalOverride returns true.
-	for _, s1 := range s.states {
-		for _, s2 := range s.states {
-			m := newMember(s.localAddr, s1)
-			c := newChange(s.localAddr, s2)
-			expected := (c.Status == Suspect || c.Status == Faulty || c.Status == Tombstone) && c.Incarnation >= m.Incarnation
-			got := m.localOverride(s.localAddr, c)
-			s.Equal(expected, got, "expected override when change.Status is suspect or faulty")
-
-			m = newMember(s.nonLocalAddr, s1)
-			c = newChange(s.nonLocalAddr, s2)
-			got = m.localOverride(s.localAddr, c)
-			s.False(got, "expected no override since member is not local")
-		}
-	}
-}
-
 func TestMemberTestSuite(t *testing.T) {
 	suite.Run(t, new(MemberTestSuite))
 }

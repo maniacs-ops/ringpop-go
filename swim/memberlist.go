@@ -277,7 +277,16 @@ func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
 	return m.MakeChange(address, incarnation, Faulty)
 }
 
+// TODO: MakeLeave is only during testing. Need to figure out if we want to keep
+// it around or rewrite the tests.
 func (m *memberlist) MakeLeave(address string, incarnation int64) []Change {
+	// for backwards compatibility in tests we allow to update the local member
+	// in place when the gossip is about the local node and an incarnation number
+	// that is expected to have accept the update.
+	if address == m.local.Address && m.local.Incarnation <= incarnation {
+		m.local.Status = Leave
+	}
+
 	m.node.emit(MakeNodeStatusEvent{Leave})
 	return m.MakeChange(address, incarnation, Leave)
 }
