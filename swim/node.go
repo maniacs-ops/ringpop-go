@@ -136,14 +136,15 @@ func mergeDefaultOptions(opts *Options) *Options {
 // implements.
 type NodeInterface interface {
 	Bootstrap(opts *BootstrapOptions) ([]string, error)
-	CountReachableMembers() int
+	CountMembers(predicates ...MemberPredicate) int
 	Destroy()
 	GetChecksum() uint32
-	GetReachableMembers() []string
+	GetMembers(predicates ...MemberPredicate) []Member
 	MemberStats() MemberStats
 	ProtocolStats() ProtocolStats
 	Ready() bool
 	RegisterListener(l events.EventListener)
+	SetLabel(key, value string)
 }
 
 // A Node is a SWIM member
@@ -517,16 +518,18 @@ func (n *Node) pingNextMember() {
 	n.logger.WithField("target", target).Info("ping request target reachable")
 }
 
-// GetReachableMembers returns a slice of members currently in this node's
-// membership list that aren't faulty.
-func (n *Node) GetReachableMembers() []string {
-	return n.memberlist.GetReachableMembers()
+// GetMembers returns a slice of members containing only members that satisfies
+// all predicates passed in. An example usecase is to use the ReachableMember
+// predicate only get members that are deemed reachable by the rules of SWIM.
+func (n *Node) GetMembers(predicates ...MemberPredicate) []Member {
+	return n.memberlist.GetMembers(predicates...)
 }
 
-// CountReachableMembers returns the number of members currently in this node's
-// membership list that aren't faulty.
-func (n *Node) CountReachableMembers() int {
-	return n.memberlist.CountReachableMembers()
+// CountMembers returns the number of members currently in this node's
+// membership list that satisfies all predicates passed in. And example usecase
+// is to count all reachable members by passing the ReachableMember predicate.
+func (n *Node) CountMembers(predicates ...MemberPredicate) int {
+	return n.memberlist.CountMembers(predicates...)
 }
 
 // SetLabel changes the contents of a label on the local ringpop node. Setting a
