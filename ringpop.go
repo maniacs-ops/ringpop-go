@@ -60,6 +60,8 @@ type Interface interface {
 
 	HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error)
 	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
+
+	Labels() (Labels, error)
 }
 
 // Ringpop is a consistent hashring that uses a gossip protocol to disseminate
@@ -174,7 +176,10 @@ func (rp *Ringpop) init() error {
 		StateTimeouts: rp.config.StateTimeouts,
 		Clock:         rp.clock,
 	})
+
 	rp.node.RegisterListener(rp)
+
+	// make a labels proxy for the node
 
 	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
 	rp.ring.RegisterListener(rp)
@@ -736,15 +741,30 @@ func (rp *Ringpop) Forward(dest string, keys []string, request []byte, service, 
 	return rp.forwarder.ForwardRequest(request, dest, service, endpoint, keys, format, opts)
 }
 
-// SetLabel sets the label of this node to a given value. It can be used by other
-// nodes to find back this node.
-func (rp *Ringpop) SetLabel(key, value string) error {
+// Labels provides access to a mutator of ringpop Labels that will be shared on
+// the membership. Changes made on the mutator are synchronized accross the
+// cluster for other members to make local decisions on.
+func (rp *Ringpop) Labels() (Labels, error) {
 	if !rp.Ready() {
-		return ErrNotBootstrapped
+		return nil, ErrNotBootstrapped
 	}
 
-	rp.node.SetLabel(key, value)
-	return nil
+	var labels Labels
+
+	labels = rp.node.Labels()
+
+	if labels == nil {
+		// When ringpop is ready but has no labels object to mutate the labels of
+		// this instance it is backed by a membership that does not support the
+		// labels feature. Currently there is only 1 implementation of membership
+		// that is backed by SWIM which we have augmented to gossip labels so this
+		// will never be the case but future implementations might have this case.
+		// By returning an error in that case we guarantee that labels will never
+		// be nil and can be used when no error is returned.
+		return nil, ErrLabelsNotSupported
+	}
+
+	return labels, nil
 }
 
 // SerializeThrift takes a thrift struct and returns the serialized bytes

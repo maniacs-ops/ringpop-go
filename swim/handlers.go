@@ -155,7 +155,7 @@ func (n *Node) adminLeaveHandler(ctx json.Context, req *emptyArg) (*Status, erro
 }
 
 func (n *Node) adminSetLabelHandler(ctx json.Context, req *SetLabelRequest) (*Status, error) {
-	n.SetLabel(req.Key, req.Value)
+	n.Labels().Set(req.Key, req.Value)
 	return &Status{Status: "ok"}, nil
 }
 

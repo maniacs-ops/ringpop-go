@@ -144,7 +144,8 @@ type NodeInterface interface {
 	ProtocolStats() ProtocolStats
 	Ready() bool
 	RegisterListener(l events.EventListener)
-	SetLabel(key, value string)
+
+	Labels() NodeLabels
 }
 
 // A Node is a SWIM member
@@ -532,9 +533,9 @@ func (n *Node) CountMembers(predicates ...MemberPredicate) int {
 	return n.memberlist.CountMembers(predicates...)
 }
 
-// SetLabel changes the contents of a label on the local ringpop node. Setting a
-// label will trigger the label to be gossiped around via SWIM to all participating
-// nodes. The label will eventually become available to all members to query on.
-func (n *Node) SetLabel(key, value string) {
-	n.memberlist.SetLocalLabel(key, value)
+// Labels returns a mutator for the labels kept on this local node. This mutator
+// interacts with the local node and memberlist to change labels on this node
+// and gossip those changes around.
+func (n *Node) Labels() NodeLabels {
+	return NodeLabels{n}
 }

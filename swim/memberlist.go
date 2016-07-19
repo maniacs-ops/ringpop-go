@@ -298,7 +298,10 @@ func (m *memberlist) SetLocalStatus(status string) {
 	m.postLocalUpdate()
 }
 
-func (m *memberlist) SetLocalLabel(key, value string) {
+func (m *memberlist) SetLocalLabel(key, value string) error {
+	// TODO implement a sane limit for the size of the labels to prevent users
+	// from impacting the performance of the gossip protocol.
+
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
 		m.local.Labels = make(map[string]string)
@@ -307,6 +310,31 @@ func (m *memberlist) SetLocalLabel(key, value string) {
 	// set the label
 	m.local.Labels[key] = value
 	m.postLocalUpdate()
+
+	// there was no error during the manipulation of labels
+	return nil
+}
+
+// GetLocalLabel returns the value of a label set on the local node. Its second
+// argument indicates if the key was present on the node or not
+func (m *memberlist) GetLocalLabel(key string) (string, bool) {
+	value, has := m.local.Labels[key]
+	return value, has
+}
+
+// LocalLabelsAsMap copies the labels set on the local node into a map for the
+// callee to use. Changes to this map will not be reflected in the labels kept
+// by this node.
+func (m *memberlist) LocalLabelsAsMap() map[string]string {
+	if len(m.local.Labels) == 0 {
+		return nil
+	}
+
+	cpy := make(map[string]string)
+	for k, v := range m.local.Labels {
+		cpy[k] = v
+	}
+	return cpy
 }
 
 // SetLocalLabels updates multiple labels at once. It will take all the labels
@@ -329,17 +357,22 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) {
 }
 
 // Remove a label from the local map of labels. This will trigger a reincarnation
-// of the member to gossip its labels around.
-func (m *memberlist) RemoveLocalLabel(keys ...string) {
-	if m.local.Labels == nil {
+// of the member to gossip its labels around. It returns true if all labels have
+// been removed.
+func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
+	if len(m.local.Labels) == 0 || len(keys) == 0 {
 		// nothing to delete
-		return
+		return false
 	}
 
+	removed := true
 	for _, key := range keys {
+		_, has := m.local.Labels[key]
 		delete(m.local.Labels, key)
+		removed = removed && has
 	}
 	m.postLocalUpdate()
+	return removed
 }
 
 // postLocalUpdate should be called after the local Member has been updated to
