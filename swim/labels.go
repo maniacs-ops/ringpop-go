@@ -7,24 +7,24 @@ type NodeLabels struct {
 }
 
 // Get the value of a label for this node
-func (n NodeLabels) Get(key string) (value string, has bool) {
+func (n *NodeLabels) Get(key string) (value string, has bool) {
 	return n.node.memberlist.GetLocalLabel(key)
 }
 
 // Set the key to a specific value. Returning an error when it failed eg. when
 // the storage capacity for labels has exceed the maximum ammount. (Currently
 // the storage limit is not implemented)
-func (n NodeLabels) Set(key, value string) error {
+func (n *NodeLabels) Set(key, value string) error {
 	return n.node.memberlist.SetLocalLabel(key, value)
 }
 
 // Remove a key from the labels
-func (n NodeLabels) Remove(key string) (removed bool) {
+func (n *NodeLabels) Remove(key string) (removed bool) {
 	return n.node.memberlist.RemoveLocalLabel(key)
 }
 
 // AsMap gets a readonly copy of all the labels assigned to Node. Changes to the
 // map will not be refelected in the node.
-func (n NodeLabels) AsMap() map[string]string {
+func (n *NodeLabels) AsMap() map[string]string {
 	return n.node.memberlist.LocalLabelsAsMap()
 }

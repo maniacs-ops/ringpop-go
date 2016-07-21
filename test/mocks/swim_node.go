@@ -128,7 +128,18 @@ func (_m *SwimNode) RegisterListener(l events.EventListener) {
 	_m.Called(l)
 }
 
-// SetLabel provides a mock function with given fields: key, value
-func (_m *SwimNode) SetLabel(key string, value string) {
-	_m.Called(key, value)
+// Labels provides a mock function with given fields:
+func (_m *SwimNode) Labels() *swim.NodeLabels {
+	ret := _m.Called()
+
+	var r0 *swim.NodeLabels
+	if rf, ok := ret.Get(0).(func() *swim.NodeLabels); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*swim.NodeLabels)
+		}
+	}
+
+	return r0
 }
