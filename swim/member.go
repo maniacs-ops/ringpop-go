@@ -177,9 +177,13 @@ func acceptGossip(old *Member, gossip *Member) bool {
 		return true
 	}
 
+	if statePrecedence(gossip.Status) < statePrecedence(old.Status) {
+		return false
+	}
+
 	// pick the lowest labels checksum, ignoring the gossip when the checksums
 	// are the same.
-	return gossip.Labels.checksum() > old.Labels.checksum()
+	return gossip.Labels.checksum() < old.Labels.checksum()
 }
 
 func statePrecedence(s string) int {
