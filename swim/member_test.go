@@ -21,6 +21,7 @@
 package swim
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
@@ -92,4 +93,52 @@ func TestChangeOmitTombstone(t *testing.T) {
 	json.Unmarshal(data, &parsedMap)
 	_, has := parsedMap["tombstone"]
 	assert.False(t, has, "don't expect the tombstone field to be serialized when it is")
+}
+
+func TestMemberChecksumString(t *testing.T) {
+	member := Member{
+		Address:     "192.168.2.1:1234",
+		Status:      Alive,
+		Incarnation: 42,
+	}
+
+	var b bytes.Buffer
+	member.checksumString(&b)
+
+	assert.Equal(t, "192.168.2.1:1234alive42", b.String(), "member checksum serialization failed")
+}
+
+func TestMemberChecksumStringLabels(t *testing.T) {
+	member := Member{
+		Address:     "192.168.2.1:1234",
+		Status:      Alive,
+		Incarnation: 42,
+		Labels: LabelMap{
+			"hello": "world",
+		},
+	}
+
+	var b bytes.Buffer
+	member.checksumString(&b)
+
+	// the number 1613250528 is the farmhash fingerprint of /hello/world
+	assert.Equal(t, "192.168.2.1:1234alive42#labels1613250528", b.String(), "member checksum serialization failed")
+}
+
+func TestMemberChecksumStringMultiLabels(t *testing.T) {
+	member := Member{
+		Address:     "192.168.2.1:1234",
+		Status:      Alive,
+		Incarnation: 42,
+		Labels: LabelMap{
+			"hello": "world",
+			"foo":   "bar",
+		},
+	}
+
+	var b bytes.Buffer
+	member.checksumString(&b)
+
+	// the number -1494888142 is the farmhash fingerprint of /hello/world xorred with the fingerprint of /foo/bar
+	assert.Equal(t, "192.168.2.1:1234alive42#labels-1494888142", b.String(), "member checksum serialization failed")
 }
