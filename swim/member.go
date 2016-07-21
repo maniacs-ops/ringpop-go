@@ -24,8 +24,9 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
-	"sort"
+	"strconv"
 
+	"github.com/dgryski/go-farm"
 	"github.com/uber/ringpop-go/util"
 )
 
@@ -81,29 +82,52 @@ func (m Member) checksumString(b *bytes.Buffer) {
 	m.Labels.checksumString(b)
 }
 
+// checksumString adds the label portion of the checksum to the buffer that is
+// passed in. The string will not be appended in the case where labels are not
+// set on this member. This is for backwards compatibility reasons with older
+// versions.
 func (l LabelMap) checksumString(b *bytes.Buffer) {
-	// add the labels to the checksumstring
-	if len(l) > 0 {
+	checksum := l.checksum()
 
-		// to ensure deterministic string generation we will sort the keys
-		// before adding them to the buffer
-		keys := make([]string, 0, len(l))
-		for key := range l {
-			keys = append(keys, key)
-		}
-		// TODO make sure this works on different locales
-		sort.Strings(keys)
-
-		for _, key := range keys {
-			value := l[key]
-			// add the label seperator. By adding the seperator at the beginning
-			// it will seperate the labels from the beginning for the checksum
-			b.WriteString("-")
-			b.WriteString(key)
-			b.WriteString("-")
-			b.WriteString(value)
-		}
+	if checksum == 0 {
+		// we don't write the checksum of the labels if the value of the checksum
+		// is 0 (zero) to be backwards compatible with ringpop applications on
+		// an older version. This only works if the newer version does not use
+		// labels
+		return
 	}
+
+	// write #labels<checksum> to the buffer which will be appended to the
+	// checksum string for the node.
+	b.WriteString("#labels")
+	b.WriteString(strconv.Itoa(int(checksum)))
+}
+
+// checksum computes a checksum for the labels. It will return 0 (zero) when no
+// labels are set, but 0 does not indicate that no labels are set. It could be
+// possible that 0 is computed as the checksum.
+func (l LabelMap) checksum() int32 {
+	var lb bytes.Buffer
+	var checksum uint32
+	for key, value := range l {
+		// decide if we want to escape both fields to enforce uniqueness of the
+		// key-value checksum.
+		lb.WriteString("/")
+		lb.WriteString(key)
+		lb.WriteString("/")
+		lb.WriteString(value)
+
+		checksum = checksum ^ farm.Fingerprint32(lb.Bytes())
+
+		lb.Reset()
+	}
+
+	var signedChecksum int32
+	// This line converts an unsigned integer to a signed integer (32 bits).
+	// It is needed to be able to calculate the same value in nodejs for
+	// ringpop-node and the integration tests in ringpop-common.
+	signedChecksum = int32(checksum>>1)<<1 | int32(checksum&uint32(1))
+	return signedChecksum
 }
 
 // shuffles slice of members pseudo-randomly, returns new slice
