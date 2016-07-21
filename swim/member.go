@@ -177,11 +177,9 @@ func acceptGossip(old *Member, gossip *Member) bool {
 		return true
 	}
 
-	// TODO add check to deterministically pick a member based on the labels
-
-	// in the end there is no reason to accept the gossip, we already have the
-	// latest view of the node.
-	return false
+	// pick the lowest labels checksum, ignoring the gossip when the checksums
+	// are the same.
+	return gossip.Labels.checksum() > old.Labels.checksum()
 }
 
 func statePrecedence(s string) int {
